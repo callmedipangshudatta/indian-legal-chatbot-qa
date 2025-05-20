@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indian Legal Chatbot</title>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        html {
+            line-height: 1.6;
+        }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(rgba(19, 78, 74, 0.85), rgba(19, 78, 74, 0.85)), url('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80');
+            background-size: cover;
+            background-attachment: fixed;
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background-color: #134E4A;
+            color: #F9F7EB;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+        .header h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5rem;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+        .header h1 svg {
+            fill: #8B5A2B;
+            width: 2.25rem;
+            height: 2.25rem;
+        }
+        .header p {
+            font-size: 1rem;
+            opacity: 0.9;
+            margin-top: 0.5rem;
+        }
+        .main-container {
+            display: flex;
+            max-width: 1200px;
+            margin: 1.5rem auto;
+            flex-grow: 1;
+            gap: 1rem;
+            padding: 0 1rem;
+        }
+        .sidebar {
+            width: 250px;
+            background: #F9F7EB;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+            position: sticky;
+            top: 6rem;
+            max-height: calc(100vh - 7rem);
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+        }
+        .sidebar.hidden {
+            transform: translateX(-100%);
+            position: absolute;
+            z-index: 30;
+        }
+        .sidebar-toggle {
+            display: none;
+            background: #8B5A2B;
+            color: #F9F7EB;
+            padding: 0.5rem;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            position: fixed;
+            top: 6rem;
+            left: 1rem;
+            z-index: 40;
+        }
+        .sidebar-toggle svg {
+            fill: #F9F7EB;
+            width: 1.5rem;
+            height: 1.5rem;
+        }
+        .sidebar h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.5rem;
+            color: #134E4A;
+            margin-bottom: 1rem;
+        }
+        .sidebar input {
+            width: 100%;
+            padding: 0.6rem;
+            border: 1px solid #D1D5DB;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+        .sidebar input:focus {
+            border-color: #8B5A2B;
+            outline: none;
+        }
+        .sidebar .category {
+            margin-bottom: 1rem;
+        }
+        .sidebar .category h3 {
+            font-size: 1.1rem;
+            color: #134E4A;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+        }
+        .sidebar .category h3 svg {
+            fill: #8B5A2B;
+            width: 1rem;
+            height: 1rem;
+            transition: transform 0.2s;
+        }
+        .sidebar .category h3.active svg {
+            transform: rotate(180deg);
+        }
+        .sidebar .subtopics {
+            display: none;
+            padding-left: 1rem;
+        }
+        .sidebar .subtopics.active {
+            display: block;
+        }
+        .sidebar .subtopics button {
+            display: block;
+            background: none;
+            border: none;
+            color: #333;
+            font-size: 0.9rem;
+            padding: 0.4rem 0;
+            cursor: pointer;
+            text-align: left;
+            width: 100%;
+            transition: color 0.2s;
+        }
+        .sidebar .subtopics button:hover {
+            color: #8B5A2B;
+        }
+        .chat-section {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            justify-content: center;
+            margin-bottom: 1rem;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .suggestions.active {
+            max-height: 200px;
+        }
+        .suggestion {
+            background: #8B5A2B;
+            color: #F9F7EB;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .suggestion:hover {
+            background: #6F4A22;
+        }
+        .quick-buttons {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+        .quick-button {
+            background: #134E4A;
+            color: #F9F7EB;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .quick-button:hover {
+            background: #0F3B36;
+        }
+        .chat-container {
+            background: #F9F7EB;
+            border-radius: 16px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+            padding: 2rem;
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-bottom: 1.5rem;
+            max-height: 60vh;
+            position: relative;
+        }
+        .chat-messages {
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+        }
+        .message {
+            max-width: 75%;
+            padding: 0.8rem 1.2rem;
+            border-radius: 12px;
+            line-height: 1.5;
+            position: relative;
+            background: linear-gradient(145deg, #FFFFFF, #E5E7EB);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .message.user {
+            background: linear-gradient(145deg, #134E4A, #1A6A64);
+            color: #F9F7EB;
+            margin-left: auto;
+            border-bottom-right-radius: 4px;
+        }
+        .message.bot {
+            background: linear-gradient(145deg, #E5E7EB, #D1D5DB);
+            color: #333;
+            margin-right: auto;
+            border-bottom-left-radius: 4px;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+        .message.bot svg {
+            fill: #8B5A2B;
+            width: 1.5rem;
+            height: 1.5rem;
+            flex-shrink: 0;
+        }
+        .message .timestamp {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-top: 0.3rem;
+            text-align: right;
+        }
+        .message.typing {
+            background: #E5E7EB;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+        }
+        .message.typing .dots {
+            display: flex;
+            gap: 0.2rem;
+        }
+        .message.typing .dot {
+            width: 6px;
+            height: 6px;
+            background: #8B5A2B;
+            border-radius: 50%;
+            animation: pulse 1.2s infinite;
+        }
+        .message.typing .dot:nth-child(2) { animation-delay: 0.2s; }
+        .message.typing .dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.7; }
+        }
+        .input-container {
+            display: flex;
+            gap: 0.75rem;
+            background: #F9F7EB;
+            padding: 1rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+        .input-container input {
+            flex-grow: 1;
+            padding: 0.8rem;
+            border: 1px solid #D1D5DB;
+            border-radius: 10px;
+            font-size: 1rem;
+            outline: none;
+        }
+        .input-container input:focus {
+            border-color: #8B5A2B;
+            box-shadow: 0 0 0 3px rgba(139, 90, 43, 0.2);
+        }
+        .input-container button {
+            background: #8B5A2B;
+            color: #F9F7EB;
+            padding: 0.8rem 1.75rem;
+            border: none;
+            border-radius: 10px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .input-container button:hover {
+            background: #6F4A22;
+        }
+        .input-container button svg {
+            fill: #F9F7EB;
+            width: 1rem;
+            height: 1rem;
+            vertical-align: middle;
+        }
+        .clear-button {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: #8B5A2B;
+            color: #F9F7EB;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .clear-button:hover {
+            background: #6F4A22;
+        }
+        @media (max-width: 768px) {
+            .main-container {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                max-height: 50vh;
+                position: fixed;
+                top: 0;
+                left: 0;
+                transform: translateX(-100%);
+                z-index: 30;
+            }
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            .sidebar-toggle {
+                display: block;
+            }
+            .chat-section {
+                margin-top: 1rem;
+            }
+            .header h1 {
+                font-size: 2rem;
+            }
+            .header h1 svg {
+                width: 1.75rem;
+                height: 1.75rem;
+            }
+            .suggestions {
+                gap: 0.4rem;
+            }
+            .suggestion {
+                font-size: 0.85rem;
+                padding: 0.4rem 0.8rem;
+            }
+        }
+        /* Accessibility */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header" role="banner">
+        <h1>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h3l-4 4-4-4h3V7z"/>
+            </svg>
+            Indian Legal Chatbot
+        </h1>
+        <p>Your Guide to Indian Law</p>
+    </div>
+    <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle sidebar">
+        <svg viewBox="0 0 24 24">
+            <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+        </svg>
+    </button>
+    <div class="main-container" role="main">
+        <div class="sidebar hidden" role="navigation" aria-label="Legal topics menu">
+            <h2>Legal Topics</h2>
+            <input type="text" id="topic-filter" placeholder="Search topics..." aria-label="Filter legal topics" oninput="filterTopics()" />
+            <div class="category">
+                <h3 onclick="toggleCategory(this)">Constitutional Law <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5H7z"/></svg></h3>
+                <div class="subtopics">
+                    <button onclick="fillInput('What is Article 14?')">Article 14</button>
+                    <button onclick="fillInput('What is Article 19?')">Article 19</button>
+                    <button onclick="fillInput('What is Article 21?')">Article 21</button>
+                    <button onclick="fillInput('What is Article 32?')">Article 32</button>
+                    <button onclick="fillInput('What are fundamental rights?')">Fundamental Rights</button>
+                </div>
+            </div>
+            <div class="category">
+                <h3 onclick="toggleCategory(this)">Criminal Law <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5H7z"/></svg></h3>
+                <div class="subtopics">
+                    <button onclick="fillInput('What is Section 302?')">Section 302</button>
+                    <button onclick="fillInput('What is Section 375?')">Section 375</button>
+                    <button onclick="fillInput('What is Section 378?')">Section 378</button>
+                    <button onclick="fillInput('What is anticipatory bail?')">Anticipatory Bail</button>
+                    <button onclick="fillInput('What is culpable homicide?')">Culpable Homicide</button>
+                </div>
+            </div>
+            <div class="category">
+                <h3 onclick="toggleCategory(this)">Family Law <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5H7z"/></svg></h3>
+                <div class="subtopics">
+                    <button onclick="fillInput('What is Hindu Marriage Act?')">Hindu Marriage Act</button>
+                    <button onclick="fillInput('What is triple talaq?')">Triple Talaq</button>
+                    <button onclick="fillInput('What are maintenance rights?')">Maintenance Rights</button>
+                    <button onclick="fillInput('What is divorce?')">Divorce</button>
+                </div>
+            </div>
+            <div class="category">
+                <h3 onclick="toggleCategory(this)">Property Law <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5H7z"/></svg></h3>
+                <div class="subtopics">
+                    <button onclick="fillInput('What is Transfer of Property Act?')">Transfer of Property Act</button>
+                    <button onclick="fillInput('What is property registration?')">Property Registration</button>
+                    <button onclick="fillInput('What is legal heir certificate?')">Legal Heir Certificate</button>
+                    <button onclick="fillInput('What is lease?')">Lease</button>
+                </div>
+            </div>
+            <div class="category">
+                <h3 onclick="toggleCategory(this)">Contract Law <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5H7z"/></svg></h3>
+                <div class="subtopics">
+                    <button onclick="fillInput('What is breach of contract?')">Breach of Contract</button>
+                    <button onclick="fillInput('What is valid contract?')">Valid Contract</button>
+                    <button onclick="fillInput('What is Indian Contract Act?')">Indian Contract Act</button>
+                </div>
+            </div>
+            <div class="category">
+                <h3 onclick="toggleCategory(this)">Consumer Law <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5H7z"/></svg></h3>
+                <div class="subtopics">
+                    <button onclick="fillInput('What is Consumer Protection Act?')">Consumer Protection Act</button>
+                    <button onclick="fillInput('What is consumer complaint?')">Consumer Complaint</button>
+                </div>
+            </div>
+            <div class="category">
+                <h3 onclick="toggleCategory(this)">Miscellaneous <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5H7z"/></svg></h3>
+                <div class="subtopics">
+                    <button onclick="fillInput('What is RTI Act?')">RTI Act</button>
+                    <button onclick="fillInput('What is uniform civil code?')">Uniform Civil Code</button>
+                    <button onclick="fillInput('What is cyber crime?')">Cyber Crime</button>
+                    <button onclick="fillInput('What is online fraud?')">Online Fraud</button>
+                </div>
+            </div>
+            <div class="category">
+                <h3 onclick="toggleCategory(this)">Labor Law <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5H7z"/></svg></h3>
+                <div class="subtopics">
+                    <button onclick="fillInput('What is labor law?')">Labor Law</button>
+                    <button onclick="fillInput('What is minimum wages?')">Minimum Wages</button>
+                </div>
+            </div>
+            <div class="category">
+                <h3 onclick="toggleCategory(this)">Tax Law <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5H7z"/></svg></h3>
+                <div class="subtopics">
+                    <button onclick="fillInput('What is income tax?')">Income Tax</button>
+                    <button onclick="fillInput('What is GST?')">GST</button>
+                </div>
+            </div>
+            <div class="category">
+                <h3 onclick="toggleCategory(this)">Environmental Law <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5H7z"/></svg></h3>
+                <div class="subtopics">
+                    <button onclick="fillInput('What is environmental law?')">Environmental Law</button>
+                    <button onclick="fillInput('What is forest act?')">Forest Act</button>
+                </div>
+            </div>
+        </div>
+        <div class="chat-section">
+            <div class="quick-buttons">
+                <button class="quick-button" onclick="toggleSuggestions()">Toggle Suggestions</button>
+                <button class="quick-button" onclick="fillPopular()">Popular Questions</button>
+                <button class="quick-button" onclick="clearChat()">Clear Chat</button>
+            </div>
+            <div class="suggestions" id="suggestions">
+                <button class="suggestion" onclick="fillInput('What is Article 14?')">Article 14</button>
+                <button class="suggestion" onclick="fillInput('What is Article 21?')">Article 21</button>
+                <button class="suggestion" onclick="fillInput('What is Section 302?')">Section 302</button>
+                <button class="suggestion" onclick="fillInput('What is Hindu Marriage Act?')">Hindu Marriage Act</button>
+                <button class="suggestion" onclick="fillInput('What is GST?')">GST</button>
+                <button class="suggestion" onclick="fillInput('What is RTI Act?')">RTI Act</button>
+                <button class="suggestion" onclick="fillInput('What is Consumer Protection Act?')">Consumer Protection Act</button>
+                <button class="suggestion" onclick="fillInput('What is cyber crime?')">Cyber Crime</button>
+                <button class="suggestion" onclick="fillInput('What is minimum wages?')">Minimum Wages</button>
+                <button class="suggestion" onclick="fillInput('What is environmental law?')">Environmental Law</button>
+            </div>
+            <div class="chat-container" role="region" aria-label="Chat conversation">
+                <div class="chat-messages" id="chat-messages"></div>
+            </div>
+            <div class="input-container" role="form" aria-label="Chat input">
+                <label for="user-input" class="sr-only">Type your legal question</label>
+                <input id="user-input" type="text" placeholder="Type your legal question..." aria-describedby="instructions" />
+                <button id="send-button" aria-label="Send message">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                    </svg>
+                    Send
+                </button>
+            </div>
+            <p id="instructions" class="sr-only">Ask about Indian law (e.g., Constitution, IPC, property, labor). Type 'quit' to exit.</p>
+        </div>
+    </div>
+
+    <script>
+        async function loadPyodideAndPackages() {
+            let pyodide = await loadPyodide();
+            return pyodide;
+        }
+
+        async function initializeChatbot() {
+            let pyodide = await loadPyodideAndPackages();
+            await pyodide.runPythonAsync(`
+                import re
+                import warnings
+
+                warnings.filterwarnings("ignore")
+
+                def preprocess_text(text):
+                    tokens = re.findall(r'\\b\\w+\\b', text.lower())
+                    stop_words = {'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 'to', 'was', 'were', 'will', 'with', 'what', 'how', 'explain'}
+                    tokens = [t for t in tokens if t not in stop_words and t.isalpha()]
+                    return ' '.join(tokens)
+
+                class IndianLegalChatbot:
+                    def __init__(self):
+                        self.context = {
+                            "article 14": "guarantees equality before the law and equal protection of laws",
+                            "article 19": "provides freedom of speech, expression, assembly, association, movement, and residence",
+                            "article 21": "guarantees right to life and personal liberty",
+                            "article 32": "allows individuals to approach the Supreme Court for enforcement of fundamental rights",
+                            "fundamental rights": "include right to equality, freedom, life, and protection against discrimination",
+                            "supreme court": "is the apex judicial body, interprets the Constitution",
+                            "high court": "operates at the state level, handles appeals and writ petitions",
+                            "section 302": "deals with punishment for murder under the Indian Penal Code",
+                            "section 375": "defines rape and its punishment",
+                            "section 378": "defines theft under the Indian Penal Code",
+                            "anticipatory bail": "allows pre-arrest bail under Section 438 of CrPC",
+                            "culpable homicide": "covered under Section 299, less severe than murder",
+                            "hindu marriage act": "governs Hindu marriages, enacted in 1955",
+                            "triple talaq": "was abolished in 2017, criminalized under Muslim Women Act",
+                            "maintenance rights": "provided under Section 125 of CrPC for spouses and children",
+                            "divorce": "governed by personal laws like Hindu Marriage Act or Special Marriage Act",
+                            "transfer of property act": "enacted in 1882, governs property transfers",
+                            "property registration": "requires a valid sale deed under Registration Act, 1908",
+                            "legal heir certificate": "establishes inheritance rights for property claims",
+                            "lease": "a temporary transfer of property rights, governed by Transfer of Property Act",
+                            "breach of contract": "failure to fulfill contract terms, remedies under Indian Contract Act",
+                            "valid contract": "requires offer, acceptance, lawful consideration, and competent parties",
+                            "indian contract act": "enacted in 1872, governs agreements and contracts",
+                            "consumer protection act": "enacted in 2019, protects against unfair trade practices",
+                            "consumer complaint": "can be filed in district, state, or national consumer forums",
+                            "rti act": "enacted in 2005, allows access to government records",
+                            "uniform civil code": "proposes standardized personal laws across religions",
+                            "cyber crime": "includes hacking, phishing, governed by Information Technology Act, 2000",
+                            "online fraud": "reportable to cyber crime cells under IT Act",
+                            "labor law": "includes Minimum Wages Act, 1948, and Industrial Disputes Act, 1947",
+                            "minimum wages": "ensures fair pay for workers under Minimum Wages Act",
+                            "income tax": "governed by Income Tax Act, 1961, levies tax on income",
+                            "gst": "Goods and Services Tax, introduced in 2017, unifies indirect taxes",
+                            "environmental law": "includes Environment Protection Act, 1986, for pollution control",
+                            "forest act": "Indian Forest Act, 1927, regulates forest conservation"
+                        }
+                        self.domain_map = {
+                            "constitutional_law": "constitutional law",
+                            "criminal_law": "criminal law",
+                            "family_law": "family law",
+                            "property_law": "property law",
+                            "contract_law": "contract law",
+                            "consumer_law": "consumer law",
+                            "misc_law": "Indian law",
+                            "labor_law": "labor law",
+                            "tax_law": "tax law",
+                            "environmental_law": "environmental law"
+                        }
+                        self.intent_keywords = {
+                            "constitutional_law": ["article", "fundamental", "supreme", "high", "court", "rights"],
+                            "criminal_law": ["section", "ipc", "homicide", "theft", "bail", "rape", "murder"],
+                            "family_law": ["marriage", "divorce", "talaq", "maintenance"],
+                            "property_law": ["property", "transfer", "registration", "heir", "lease"],
+                            "contract_law": ["contract", "breach", "agreement"],
+                            "consumer_law": ["consumer", "protection", "complaint"],
+                            "misc_law": ["rti", "civil", "cyber", "fraud"],
+                            "labor_law": ["labor", "wages", "industrial", "worker"],
+                            "tax_law": ["tax", "gst", "income"],
+                            "environmental_law": ["environment", "forest", "pollution"]
+                        }
+
+                    def get_intent(self, query):
+                        processed = preprocess_text(query).lower()
+                        for intent, keywords in self.intent_keywords.items():
+                            if any(keyword in processed for keyword in keywords):
+                                return intent
+                        return "misc_law"
+
+                    def get_answer(self, question):
+                        processed = preprocess_text(question).lower()
+                        for key, answer in self.context.items():
+                            key_words = key.split()
+                            if any(kw in processed for kw in key_words):
+                                return answer
+                        return "Sorry, I don't have a specific answer for that. Please try a different legal topic."
+
+                    def respond(self, user_input):
+                        unrelated = ["weather", "movie", "sports", "celebrity", "food", "game"]
+                        if any(word in user_input.lower() for word in unrelated):
+                            return "I specialize in Indian law. Please ask a legal question."
+
+                        intent = self.get_intent(user_input)
+                        answer = self.get_answer(user_input)
+
+                        return f"📘 Regarding {self.domain_map.get(intent, 'legal domain')}: {answer}"
+
+                chatbot = IndianLegalChatbot()
+            `);
+            return pyodide;
+        }
+
+        let pyodideInstance = null;
+        let recentQueries = [];
+
+        async function sendMessage() {
+            const userInput = document.getElementById("user-input").value.trim();
+            if (!userInput) return;
+
+            appendMessage("You", userInput, "user");
+            document.getElementById("user-input").value = "";
+            recentQueries.push(userInput);
+            if (recentQueries.length > 5) recentQueries.shift();
+
+            if (userInput.toLowerCase() === "quit") {
+                appendMessage("Chatbot", "Goodbye! Stay legally informed. 🏛️", "bot");
+                return;
+            }
+
+            if (!pyodideInstance) {
+                appendTypingIndicator();
+                pyodideInstance = await initializeChatbot();
+                removeTypingIndicator();
+                appendMessage("Chatbot", "Chatbot initialized! Ask your legal question.", "bot");
+            }
+
+            appendTypingIndicator();
+            try {
+                const response = await pyodideInstance.runPythonAsync(`
+                    chatbot.respond("${userInput.replace(/"/g, '\\"')}")
+                `);
+                removeTypingIndicator();
+                appendMessage("Chatbot", response, "bot");
+            } catch (error) {
+                removeTypingIndicator();
+                appendMessage("Chatbot", "Sorry, an error occurred. Please try again.", "bot");
+                console.error(error);
+            }
+        }
+
+        function appendMessage(sender, message, type) {
+            const chatMessages = document.getElementById("chat-messages");
+            const messageDiv = document.createElement("div");
+            messageDiv.className = `message ${type}`;
+            const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            if (type === "bot") {
+                messageDiv.innerHTML = `
+                    <svg viewBox="0 0 24 24">
+                        <path d="M4 4h16v12H5.17L4 17.17V4m0-2C2.9 2 2 2.9 2 4v13.83L3.17 16H20c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2H4z"/>
+                    </svg>
+                    <div>
+                        <strong>${sender}:</strong> ${message}
+                        <div class="timestamp">${timestamp}</div>
+                    </div>`;
+            } else {
+                messageDiv.innerHTML = `
+                    <strong>${sender}:</strong> ${message}
+                    <div class="timestamp">${timestamp}</div>`;
+            }
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function appendTypingIndicator() {
+            const chatMessages = document.getElementById("chat-messages");
+            const typingDiv = document.createElement("div");
+            typingDiv.className = "message typing";
+            typingDiv.innerHTML = `
+                <svg viewBox="0 0 24 24">
+                    <path d="M4 4h16v12H5.17L4 17.17V4m0-2C2.9 2 2 2.9 2 4v13.83L3.17 16H20c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2H4z"/>
+                </svg>
+                <div class="dots">
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                </div>`;
+            typingDiv.id = "typing-indicator";
+            chatMessages.appendChild(typingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const typingIndicator = document.getElementById("typing-indicator");
+            if (typingIndicator) typingIndicator.remove();
+        }
+
+        function fillInput(query) {
+            document.getElementById("user-input").value = query;
+            document.getElementById("user-input").focus();
+            if (window.innerWidth <= 768) toggleSidebar();
+        }
+
+        function clearChat() {
+            document.getElementById("chat-messages").innerHTML = "";
+            appendMessage("Chatbot", "Chat cleared! Ask a new legal question.", "bot");
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.querySelector(".sidebar");
+            sidebar.classList.toggle("hidden");
+            sidebar.classList.toggle("active");
+        }
+
+        function toggleCategory(element) {
+            const subtopics = element.nextElementSibling;
+            const isActive = subtopics.classList.contains("active");
+            document.querySelectorAll(".subtopics").forEach(st => st.classList.remove("active"));
+            document.querySelectorAll(".category h3").forEach(h => h.classList.remove("active"));
+            if (!isActive) {
+                subtopics.classList.add("active");
+                element.classList.add("active");
+            }
+        }
+
+        function filterTopics() {
+            const filter = document.getElementById("topic-filter").value.toLowerCase();
+            const subtopics = document.querySelectorAll(".sidebar .subtopics button");
+            subtopics.forEach(button => {
+                const text = button.textContent.toLowerCase();
+                button.style.display = text.includes(filter) || filter === "" ? "block" : "none";
+            });
+        }
+
+        function toggleSuggestions() {
+            const suggestions = document.getElementById("suggestions");
+            suggestions.classList.toggle("active");
+        }
+
+        function fillPopular() {
+            const popularQueries = [
+                "What is Article 21?",
+                "What is Section 302?",
+                "What is GST?",
+                "What is Hindu Marriage Act?"
+            ];
+            fillInput(popularQueries[Math.floor(Math.random() * popularQueries.length)]);
+        }
+
+        document.getElementById("send-button").addEventListener("click", sendMessage);
+        document.getElementById("user-input").addEventListener("keypress", (e) => {
+            if (e.key === "Enter") sendMessage();
+        });
+    </script>
+</body>
+</html>
